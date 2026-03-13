@@ -37,25 +37,33 @@ export default function TransactionsPage() {
   const [pagination, setPagination] = useState<PaginationInfo>({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback((page: number) => {
+  const fetchData = useCallback((page: number, limit: number = pagination.limit) => {
     setLoading(true);
-    fetch(`/api/tuition/transactions?page=${page}&limit=10`)
+    fetch(`/api/tuition/transactions?page=${page}&limit=${limit}`)
       .then((r) => r.json())
       .then((res) => { setData(res.data); setPagination({ page: res.page, limit: res.limit, total: res.total, totalPages: res.totalPages }); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [pagination.limit]);
 
   useEffect(() => { fetchData(1); }, [fetchData]);
 
   return (
     <>
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-slate-800 tracking-tight mb-1">Transaksi</h2>
-        <p className="text-[14px] text-slate-400">Riwayat seluruh transaksi pembayaran</p>
+      <div className="mb-10">
+        <h2 className="text-3xl font-bold text-slate-800 tracking-tight mb-1">Transaksi Pembayaran</h2>
+        <p className="text-[14px] text-slate-400 font-medium tracking-tight">Riwayat seluruh transaksi pembayaran siswa</p>
       </div>
 
-      <div className="bg-white rounded-[28px] shadow-sm border border-slate-100/50 overflow-hidden">
-        <DataTable columns={COLUMNS} data={data} pagination={pagination} loading={loading} onPageChange={fetchData} rowKey={(r) => r.id} />
+      <div className="bg-white rounded-[20px] shadow-sm border border-slate-100/50 overflow-hidden">
+        <DataTable 
+          columns={COLUMNS} 
+          data={data} 
+          pagination={pagination} 
+          loading={loading} 
+          onPageChange={(page) => fetchData(page)} 
+          onLimitChange={(limit) => fetchData(1, limit)}
+          rowKey={(r) => r.id} 
+        />
       </div>
     </>
   );

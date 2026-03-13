@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, type FormEvent } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { PlusCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { DataTable, type Column, type PaginationInfo } from "@/components/ui/data-table";
-import { FormModal, DeleteConfirm, Field, inputClass } from "@/components/ui/form-modal";
+import { DeleteConfirm } from "@/components/ui/form-modal";
 
 interface Bill {
   id: number; title: string; total_amount: string; paid_amount: string; status: string;
@@ -43,35 +45,30 @@ const COLUMNS: Column<Bill>[] = [
 ];
 
 export default function BillsPage() {
+  const router = useRouter();
   const [data, setData] = useState<Bill[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Bill | null>(null);
   const [deleting, setDeleting] = useState<Bill | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ title: "", total_amount: "", status: "unpaid", student_id: 1, product_id: 1, academic_year_id: 2 });
 
-  const fetchData = useCallback((page: number) => {
+  const fetchData = useCallback((page: number, limit: number = pagination.limit) => {
     setLoading(true);
-    fetch(`/api/tuition/bills?page=${page}&limit=10`)
+    fetch(`/api/tuition/bills?page=${page}&limit=${limit}`)
       .then((r) => r.json())
-      .then((res) => { setData(res.data); setPagination({ page: res.page, limit: res.limit, total: res.total, totalPages: res.totalPages }); })
+      .then((res) => {
+        setData(res.data);
+        setPagination({
+          page: res.page,
+          limit: res.limit,
+          total: res.total,
+          totalPages: res.totalPages,
+        });
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [pagination.limit]);
 
   useEffect(() => { fetchData(1); }, [fetchData]);
-
-  const openCreate = () => { setEditing(null); setForm({ title: "", total_amount: "", status: "unpaid", student_id: 1, product_id: 1, academic_year_id: 2 }); setModalOpen(true); };
-  const openEdit = (r: Bill) => { setEditing(r); setForm({ title: r.title, total_amount: String(r.total_amount), status: r.status, student_id: 1, product_id: 1, academic_year_id: 2 }); setModalOpen(true); };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault(); setSaving(true);
-    const url = editing ? `/api/tuition/bills/${editing.id}` : "/api/tuition/bills";
-    await fetch(url, { method: editing ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    toast.success(editing ? "Tagihan diperbarui" : "Tagihan berhasil ditambahkan");
-    setSaving(false); setModalOpen(false); fetchData(pagination.page);
-  };
 
   const handleDelete = async () => {
     if (!deleting) return; setSaving(true);
@@ -82,31 +79,32 @@ export default function BillsPage() {
 
   return (
     <>
-      <div className="mb-8 flex justify-between items-end">
+      <div className="mb-10 flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight mb-1">Tagihan SPP</h2>
-          <p className="text-[14px] text-slate-400">Monitor seluruh tagihan siswa dan status pembayaran</p>
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tight mb-1">Tagihan SPP</h2>
+          <p className="text-[14px] text-slate-400 font-medium tracking-tight">Monitor seluruh tagihan siswa dan status pembayaran</p>
         </div>
-        <button onClick={openCreate} className="bg-slate-800 text-white px-5 py-2.5 rounded-xl text-[13px] font-semibold flex items-center gap-2 hover:bg-slate-700 shadow-sm transition-all">
+        <Link 
+          href="/tuition/bills/new" 
+          className="bg-slate-800 text-white px-6 py-3 rounded-2xl text-[13px] font-bold flex items-center gap-2 hover:bg-slate-700 shadow-sm transition-all"
+        >
           <PlusCircle size={16} /> Tambah Tagihan
-        </button>
+        </Link>
       </div>
 
-      <div className="bg-white rounded-[28px] shadow-sm border border-slate-100/50 overflow-hidden">
-        <DataTable columns={COLUMNS} data={data} pagination={pagination} loading={loading} onPageChange={fetchData} onEdit={openEdit} onDelete={(r) => setDeleting(r)} rowKey={(r) => r.id} />
+      <div className="bg-white rounded-[20px] shadow-sm border border-slate-100/50 overflow-hidden">
+        <DataTable 
+          columns={COLUMNS} 
+          data={data} 
+          pagination={pagination} 
+          loading={loading} 
+          onPageChange={(page) => fetchData(page)} 
+          onLimitChange={(limit) => fetchData(1, limit)}
+          onEdit={(r) => router.push(`/tuition/bills/${r.id}/edit`)} 
+          onDelete={(r) => setDeleting(r)} 
+          rowKey={(r) => r.id} 
+        />
       </div>
-
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Tagihan" : "Tambah Tagihan"} onSubmit={handleSubmit} loading={saving}>
-        <Field label="Judul Tagihan"><input className={inputClass} placeholder="SPP Oktober 2025" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></Field>
-        <Field label="Jumlah (Rp)"><input type="number" className={inputClass} value={form.total_amount} onChange={(e) => setForm({ ...form, total_amount: e.target.value })} required /></Field>
-        <Field label="Status">
-          <select className={inputClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-            <option value="unpaid">Belum Bayar</option>
-            <option value="partial">Parsial</option>
-            <option value="paid">Lunas</option>
-          </select>
-        </Field>
-      </FormModal>
 
       <DeleteConfirm open={!!deleting} onClose={() => setDeleting(null)} onConfirm={handleDelete} loading={saving} itemName={deleting?.title ?? ""} />
     </>

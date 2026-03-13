@@ -3,6 +3,19 @@ import { NextRequest } from "next/server";
 
 export const runtime = "edge";
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const rows = await sql`
+    SELECT id, school_id, full_name, nis, nisn, gender, date_of_birth, phone, email
+    FROM core_students WHERE id = ${Number(id)}
+  `;
+  if (!rows.length) return Response.json({ error: "Not found" }, { status: 404 });
+  return Response.json(rows[0]);
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

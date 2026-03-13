@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, type FormEvent } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { School, MapPin, PlusCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { DataTable, type Column, type PaginationInfo } from "@/components/ui/data-table";
-import { FormModal, DeleteConfirm, Field, inputClass } from "@/components/ui/form-modal";
+import { DeleteConfirm } from "@/components/ui/form-modal";
 
 interface SchoolRow {
   id: number;
@@ -41,37 +43,22 @@ const COLUMNS: Column<SchoolRow>[] = [
 ];
 
 export default function SchoolsPage() {
+  const router = useRouter();
   const [data, setData] = useState<SchoolRow[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<SchoolRow | null>(null);
   const [deleting, setDeleting] = useState<SchoolRow | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", address: "" });
 
-  const fetchData = useCallback((page: number) => {
+  const fetchData = useCallback((page: number, limit: number = pagination.limit) => {
     setLoading(true);
-    fetch(`/api/core/schools?page=${page}&limit=10`)
+    fetch(`/api/core/schools?page=${page}&limit=${limit}`)
       .then((r) => r.json())
       .then((res) => { setData(res.data); setPagination({ page: res.page, limit: res.limit, total: res.total, totalPages: res.totalPages }); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [pagination.limit]);
 
   useEffect(() => { fetchData(1); }, [fetchData]);
-
-  const openCreate = () => { setEditing(null); setForm({ name: "", address: "" }); setModalOpen(true); };
-  const openEdit = (r: SchoolRow) => { setEditing(r); setForm({ name: r.name, address: r.address || "" }); setModalOpen(true); };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    const url = editing ? `/api/core/schools/${editing.id}` : "/api/core/schools";
-    const method = editing ? "PUT" : "POST";
-    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    toast.success(editing ? "Data berhasil diperbarui" : "Data berhasil ditambahkan");
-    setSaving(false); setModalOpen(false); fetchData(pagination.page);
-  };
 
   const handleDelete = async () => {
     if (!deleting) return;
@@ -83,37 +70,32 @@ export default function SchoolsPage() {
 
   return (
     <>
-      <div className="mb-8 flex justify-between items-end">
+      <div className="mb-10 flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight mb-1">Data Sekolah</h2>
-          <p className="text-[14px] text-slate-400">Kelola daftar sekolah di bawah yayasan</p>
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tight mb-1">Data Sekolah</h2>
+          <p className="text-[14px] text-slate-400 font-medium tracking-tight">Kelola daftar sekolah di bawah yayasan</p>
         </div>
-        <button onClick={openCreate} className="bg-slate-800 text-white px-5 py-2.5 rounded-xl text-[13px] font-semibold flex items-center gap-2 hover:bg-slate-700 shadow-sm transition-all">
+        <Link 
+          href="/core/schools/new" 
+          className="bg-slate-800 text-white px-6 py-3 rounded-2xl text-[13px] font-bold flex items-center gap-2 hover:bg-slate-700 shadow-sm transition-all"
+        >
           <PlusCircle size={16} /> Tambah Sekolah
-        </button>
+        </Link>
       </div>
 
-      <div className="bg-white rounded-[28px] shadow-sm border border-slate-100/50 overflow-hidden">
+      <div className="bg-white rounded-[20px] shadow-sm border border-slate-100/50 overflow-hidden">
         <DataTable
           columns={COLUMNS}
           data={data}
           pagination={pagination}
           loading={loading}
-          onPageChange={fetchData}
-          onEdit={openEdit}
+          onPageChange={(page) => fetchData(page)}
+          onLimitChange={(limit) => fetchData(1, limit)}
+          onEdit={(r) => router.push(`/core/schools/${r.id}/edit`)}
           onDelete={(r) => setDeleting(r)}
           rowKey={(r) => r.id}
         />
       </div>
-
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Sekolah" : "Tambah Sekolah"} onSubmit={handleSubmit} loading={saving}>
-        <Field label="Nama Sekolah">
-          <input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        </Field>
-        <Field label="Alamat">
-          <input className={inputClass} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-        </Field>
-      </FormModal>
 
       <DeleteConfirm open={!!deleting} onClose={() => setDeleting(null)} onConfirm={handleDelete} loading={saving} itemName={deleting?.name ?? ""} />
     </>
